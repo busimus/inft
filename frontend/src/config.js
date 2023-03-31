@@ -1,7 +1,7 @@
 import { Address } from "ethereumjs-util";
 
 export const INFT_CONTRACT = Address.fromString(
-  "0xd50bb43d94d335c90b8531d9b45009c57ca59351"
+  "0x3bea3f5fc9cde0062249735ed003bc49c76de098"
 );
 
 export const ART_GENERATORS = {

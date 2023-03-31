@@ -251,7 +251,7 @@ export class IRC721 {
       util.assert(this._approvedGenerators.get(artContract, false), "Art contract not approved")
     }
     util.assert(this.mintedBy(caller) == ZERO_TOKEN, "Caller already generated")
-    Host.createGetIdentityPromise(caller, 200000).then("_generateIdentityCallback", [Bytes.fromU64(ZERO_TOKEN), artContract], Balance.Zero, this._identityCallbackGas)
+    Host.createGetIdentityPromise(caller, 200000).then("_generateIdentityCallback", [Bytes.fromU64(ZERO_TOKEN), artContract, caller], Balance.Zero, this._identityCallbackGas)
   }
 
   regenerate(tokenId: u64, artContract: Address): void {
@@ -274,10 +274,10 @@ export class IRC721 {
     } else {
       util.assert(identity != null, "Token has no identity") // should never happen
     }
-    Host.createGetIdentityPromise(originalMinter, 200000).then("_generateIdentityCallback", [Bytes.fromU64(tokenId), artContract], Balance.Zero, this._identityCallbackGas)
+    Host.createGetIdentityPromise(originalMinter, 200000).then("_generateIdentityCallback", [Bytes.fromU64(tokenId), artContract, originalMinter], Balance.Zero, this._identityCallbackGas)
   }
 
-  _generateIdentityCallback(tokenId: u64, artContract: Address): void {
+  _generateIdentityCallback(tokenId: u64, artContract: Address, identityAddress: Address): void {
     const receiver = Context.originalCaller()
     let identData = Host.promiseResult().value()
     Host.emitEvent("IdentityData", [identData])
@@ -286,11 +286,11 @@ export class IRC721 {
     util.assert(identity.state == 3 || identity.state == 7 || identity.state == 8, "Not validated identity")
 
     Host.createCallFunctionPromise(artContract, "generateArt", [identData, receiver], Balance.Zero, this._generateGas)
-    .then("_mintGeneratedToken", [Bytes.fromU64(tokenId), receiver, artContract], Balance.Zero, this._mintGas);
+    .then("_mintGeneratedToken", [Bytes.fromU64(tokenId), receiver, artContract, identityAddress], Balance.Zero, this._mintGas);
   }
 
   @mutateState
-  _mintGeneratedToken(tokenId: u64, receiver: Address, artContract: Address): u64 {
+  _mintGeneratedToken(tokenId: u64, receiver: Address, artContract: Address, identityAddress: Address): u64 {
     util.assert(Host.promiseResult().failed() === false, 'Failed to generate art')
     let tokenUri = Host.promiseResult().value()
 
@@ -306,7 +306,7 @@ export class IRC721 {
 
     let token: JSON.Obj = <JSON.Obj>(JSON.parse(tokenUri));
     token.set("name", `${this._name} #${tokenId.toString()}`);
-    token.set("identity", `0x${receiver.toString()}`);
+    token.set("identity", `0x${identityAddress.toString()}`);
     token.set("tokenId", tokenId.toString());
     token.set("generatedEpoch", Context.epoch().toString());
     token.set("artContract", `0x${artContract.toString()}`);

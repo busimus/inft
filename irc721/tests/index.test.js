@@ -751,7 +751,6 @@ it("can transfer and burn", async () => {
 
   // Check that IDs are correct
   expect(ownedBy[ONE_ADDRESS]).toEqual(new Set(['0x0100000000000000', '0x0200000000000000', '0x0300000000000000']))
-
   // Try self transfer
   let selfSendTx = await call_from(recvAddr, provider,
     inftContract,
@@ -785,10 +784,70 @@ it("can transfer and burn", async () => {
   // Check that balance hasn't changed
   const selfTransferBalance = await getBalance(ONE_ADDRESS)
   expect(selfTransferBalance).toBe(genBalance)
-  // Burn all tokens
+  // Regenerate and burn all tokens
   const tokens = Array.from(ownedBy[ONE_ADDRESS])
   for (const tokenId of tokens) {
-    // continue;
+    const beforeTokenUri = await estimate_output(inftContract, "tokenURI", [
+      {
+        index: 0,
+        format: ContractArgumentFormat.Hex,
+        value: tokenId,
+      },
+    ], provider)
+    expect(beforeTokenUri).toBeDefined()
+    //hex to string
+    const beforeToken = JSON.parse(Buffer.from(beforeTokenUri.slice(2), 'hex').toString('utf8'))
+
+    // Regenerate token
+    const regenTx = await call_from(ONE_ADDRESS, provider,
+      inftContract,
+      "regenerate",
+      "0",
+      "50000",
+      [
+        {
+          index: 0,
+          format: ContractArgumentFormat.Hex,
+          value: tokenId,
+        },
+        {
+          index: 1,
+          format: ContractArgumentFormat.Hex,
+          value: ZERO_ADDRESS,
+        },
+      ]
+    )
+
+    await provider.Chain.generateBlocks(1)
+
+    const regenReceipt = await provider.Chain.receipt(regenTx)
+    console.log(regenReceipt)
+    for (var i = 0; i < (regenReceipt.events || []).length; i++) {
+      // console.log(regenReceipt.events[i])
+    }
+    for (var i = 0; i < (regenReceipt.actionResult.subActionResults || []).length; i++) {
+      console.log(regenReceipt.actionResult.subActionResults[i])
+      expect(regenReceipt.actionResult.subActionResults[i].success).toBe(true)
+      if (regenReceipt.actionResult.subActionResults[i].subActionResults) {
+        for (var j = 0; j < (regenReceipt.actionResult.subActionResults[i].subActionResults || []).length; j++) {
+          console.log(regenReceipt.actionResult.subActionResults[i].subActionResults[j])
+          expect(regenReceipt.actionResult.subActionResults[i].subActionResults[j].success).toBe(true)
+        }
+      }
+    }
+    expect(regenReceipt.success).toBe(true)
+    const afterTokenUri = await estimate_output(inftContract, "tokenURI", [
+      {
+        index: 0,
+        format: ContractArgumentFormat.Hex,
+        value: tokenId,
+      },
+    ], provider)
+    expect(afterTokenUri).toBeDefined()
+    const afterToken = JSON.parse(Buffer.from(afterTokenUri.slice(2), 'hex').toString('utf8'))
+    expect(afterToken.identity).toEqual(beforeToken.identity)
+    // expect(afterToken).toEqual(beforeToken)
+
     const burnTx = await call_from(ONE_ADDRESS, provider,
       inftContract,
       'burn',

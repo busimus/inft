@@ -211,7 +211,7 @@ export default {
       const token = "tk-" + randomBytes(12).toString("hex");
 
       const url = `https://app.idena.io/dna/signin
-?callback_url=${CALLBACK_URL}%23signin?token=${token}
+?callback_url=${CALLBACK_URL}signin?token=${token}
 &token=${token}
 &nonce_endpoint=${AUTH_WORKER_URL}%2FgetToken
 &authentication_endpoint=${AUTH_WORKER_URL}%2Fauthenticate`;
@@ -243,16 +243,12 @@ export default {
       return addr;
     },
     signOut: function () {
-      history.pushState("", document.title, window.location.pathname);
+      history.pushState("", document.title, "/");
       this.address = null;
       this.identity = { state: "Undefined", address: null };
-      this.inft = {
-        balance: 0,
-        minted: null,
-        tokensOwned: [],
-        tokenUris: {},
-        recentlyMinted: [],
-      };
+      this.inft.balance = 0;
+      this.inft.minted = null;
+      this.inft.tokensOwned = [];
       localStorage.removeItem("address");
     },
     sendGenerateTx: async function () {
@@ -340,7 +336,7 @@ export default {
         const serialized = bufferToHex(tx);
         console.log("serialized", serialized);
         const url = `https://app.idena.io/dna/raw?tx=${serialized}
-        &callback_url=${CALLBACK_URL}%23${method}`;
+        &callback_url=${CALLBACK_URL}${method}`;
         window.open(url, "_blank");
       } catch (e) {
         console.error(e);
@@ -387,7 +383,8 @@ export default {
     fetchTokenUris: async function (tokenIds, force = false) {
       for (const tokenId of tokenIds) {
         let tokenUri = localStorage.getItem(`tokenUri-${tokenId}`);
-        if (tokenUri == null || tokenUri != "null" || force) {
+        if (tokenUri == null || tokenUri == "null" || force) {
+          console.warn("uncached tokenUri", tokenId, tokenUri);
           tokenUri = await this.conn.getTokenURI(tokenId);
           localStorage.setItem(`tokenUri-${tokenId}`, tokenUri);
         }
@@ -440,7 +437,6 @@ export default {
     },
   },
   mounted() {
-    this.fetchRecentlyMinted();
     if (localStorage.address != null) {
       console.log("address in storage", localStorage.address);
       if (isValidAddress(localStorage.address) == false) {
@@ -449,9 +445,9 @@ export default {
         return;
       }
       this.address = localStorage.address;
-      this.initAddress();
     }
     window.addEventListener("storage", this.onStorageUpdate);
+    this.fetchRecentlyMinted();
   },
   beforeDestroy() {
     window.removeEventListener("storage", this.onStorageUpdate);
@@ -494,56 +490,63 @@ export default {
     },
   },
   created: async function () {
-    if (location.hash) {
-      const hash = location.hash.slice(1);
-      console.log("got hash", hash);
-      if (hash.startsWith("signin?token=tk-")) {
-        const token = hash.slice(13);
-        const signature = await this.fetchSignature(token);
-        localStorage.address = this.recoverAddress(signature);
-        this.address = localStorage.address;
-        history.pushState("", document.title, window.location.pathname);
-      } else {
-        const url = new URLSearchParams(window.location.search);
-        const txHash = url.get("tx");
-        const receipt = await this.waitForReceipt(txHash);
-        history.pushState("", document.title, window.location.pathname);
-        if (receipt.success == false) {
-          console.error("TX failed", receipt);
+    const url = new URLSearchParams(window.location.search);
+    const path = location.pathname.slice(1);
+    if (path == "signin") {
+      const token = url.get("token");
+      console.log("sign in", token);
+      if (!token) {
+        console.error("No token");
+        return;
+      }
+      const signature = await this.fetchSignature(token);
+      localStorage.address = this.recoverAddress(signature);
+      this.address = localStorage.address;
+      history.pushState("", document.title, "/");
+    } else if (path) {
+      console.log("got path", path);
+      const txHash = url.get("tx");
+      if (!txHash) {
+        console.error("No TX hash");
+        return;
+      }
+      const receipt = await this.waitForReceipt(txHash);
+      history.pushState("", document.title, "/");
+      if (receipt.success == false) {
+        console.error("TX failed", receipt);
+        return;
+      }
+      if (path == "generate" || path == "regenerate") {
+        let tokenId = null;
+        for (const event of receipt.events) {
+          if (event.event == "GeneratedArt") {
+            tokenId = event.args[1];
+            console.log("generated", tokenId);
+          } else if (
+            event.event == "Transfer" &&
+            event.args[1] == this.address
+          ) {
+            tokenId = event.args[2];
+            this.inft.tokensOwned.push(tokenId);
+            console.log("transferred", tokenId);
+            break;
+          }
+        }
+        if (tokenId == null || tokenId == ZERO_TOKEN) {
+          console.error("Failed to get tokenId", tokenId);
           return;
         }
-        if (hash == "generate" || hash == "regenerate") {
-          let tokenId = null;
-          for (const event of receipt.events) {
-            if (event.event == "GeneratedArt") {
-              tokenId = event.args[1];
-              console.log("generated", tokenId);
-            } else if (
-              event.event == "Transfer" &&
-              event.args[1] == this.address
-            ) {
-              tokenId = event.args[2];
-              this.inft.tokensOwned.push(tokenId);
-              console.log("transferred", tokenId);
-              break;
-            }
-          }
-          if (tokenId == null || tokenId == ZERO_TOKEN) {
-            console.error("Failed to get tokenId", tokenId);
-            return;
-          }
-          await this.fetchTokenUris([tokenId], true);
-          this.inft.balance = await this.conn.getTokenBalance(this.address);
-          this.inft.minted = await this.conn.getMintedBy(this.address);
-        } else if (hash == "transferFrom" || hash == "burn") {
-          if (receipt.success) {
-            this.inft.balance -= 1;
-            const transferArgs = receipt.events[0].args;
-            if (transferArgs[1] != this.address.toString()) {
-              this.inft.tokensOwned = this.inft.tokensOwned.filter(
-                (token) => token != transferArgs[2]
-              );
-            }
+        await this.fetchTokenUris([tokenId], true);
+        this.inft.balance = await this.conn.getTokenBalance(this.address);
+        this.inft.minted = await this.conn.getMintedBy(this.address);
+      } else if (path == "transferFrom" || path == "burn") {
+        if (receipt.success) {
+          this.inft.balance -= 1;
+          const transferArgs = receipt.events[0].args;
+          if (transferArgs[1] != this.address.toString()) {
+            this.inft.tokensOwned = this.inft.tokensOwned.filter(
+              (token) => token != transferArgs[2]
+            );
           }
         }
       }

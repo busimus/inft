@@ -37,6 +37,9 @@
           <b-dropdown-item @click="$emit('refreshMetadata', tokenId)"
             >Refresh metadata</b-dropdown-item
           >
+          <b-dropdown-item v-if="!isOwned" @click="$emit('seeOwner', tokenId)"
+            >See owner</b-dropdown-item
+          >
           <b-dropdown-item
             v-if="isOwned"
             link-class="text-danger"
@@ -45,7 +48,8 @@
           >
         </b-dropdown>
       </div>
-      <img style="margin-bottom: 1em; width: 100%" :src="tokenImage" />
+      <!-- runs MUCH smoother on Firefox than <img> for some reason? -->
+      <object style="width: 100%" :data="tokenImage"></object>
       <b-button-group v-if="isOwned" style="width: 100%">
         <template #button-content>
           <svg

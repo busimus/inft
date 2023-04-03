@@ -116,6 +116,12 @@ export class Conn {
     return tokens;
   }
 
+  async getTokenOwner(tokenId) {
+    return await this.readCall("ownerOf", INFT_CONTRACT.toString(), [
+      { index: 0, format: "hex", value: tokenId },
+    ]);
+  }
+
   async readCall(method, from = ZERO_ADDRESS, args = []) {
     const receipt = await this.call("contract_estimateCall", [
       {

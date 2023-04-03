@@ -41,7 +41,7 @@
             <hr />
             <div class="text-center animated-underline">
               Waiting for
-              <a :href="waitingForReceiptLink">{{
+              <a :href="waitingForReceiptLink" target="_blank">{{
                 waitingForReceiptShortHash
               }}</a>
             </div>
@@ -110,6 +110,7 @@
             :generators="artGenerators"
             :selectedGenerator="selectedGenerator"
             @refreshMetadata="refreshURI"
+            @seeOwner="openTokenOwner"
           />
           <hr
             v-if="
@@ -413,6 +414,10 @@ export default {
         this.inft.recentlyMinted.push(tokenId);
         lastRecentId = tokenId;
       }
+    },
+    openTokenOwner: async function (tokenId) {
+      const owner = await this.conn.getTokenOwner(tokenId);
+      window.open(`https://scan.idena.io/identity/${owner}`, "_blank");
     },
     setGenerator(name) {
       this.selectedGenerator = name;

@@ -79,6 +79,7 @@
           <iNFT
             :tokenId="tokenId"
             :tokenUris="inft.tokenUris"
+            :tokenPngs="inft.tokenPngs"
             :isOwned="true"
             :generators="artGenerators"
             :selectedGenerator="selectedGenerator"
@@ -106,6 +107,7 @@
           <iNFT
             :tokenId="tokenIdToHex(tokenId)"
             :tokenUris="inft.tokenUris"
+            :tokenPngs="inft.tokenPngs"
             :isOwned="false"
             :generators="artGenerators"
             :selectedGenerator="selectedGenerator"
@@ -142,7 +144,7 @@
 
 <script>
 import Identity from "./components/Identity.vue";
-import iNFT from "./components/iNFT.vue";
+import { default as iNFT, rasterize } from "./components/iNFT.vue";
 import { Conn } from "./connection.js";
 import { randomBytes } from "crypto";
 import {
@@ -156,6 +158,7 @@ import {
   intToBuffer,
 } from "ethereumjs-util";
 import { Buffer } from "buffer";
+import { openDB } from "idb";
 import { BN } from "bn.js";
 import { argsToSlice } from "./utils.js";
 import { BCollapse, BIconChevronDown, BIconChevronUp } from "bootstrap-vue";
@@ -172,6 +175,17 @@ import * as proto from "./proto/models_pb.js";
 
 const STATES_CAN_MINT = ["Newbie", "Verified", "Human"];
 const ZERO_TOKEN = "0x0000000000000000";
+
+const dbPromise = openDB("inft", 1, {
+  upgrade(db) {
+    try {
+      db.createObjectStore("tokenUris");
+      db.createObjectStore("tokenPngs");
+    } catch (e) {
+      console.error("Error creating object store", e);
+    }
+  },
+});
 
 export default {
   name: "App",
@@ -199,6 +213,7 @@ export default {
         minted: "",
         tokensOwned: [],
         tokenUris: {},
+        tokenPngs: {},
         recentlyMinted: [],
       },
       artGenerators: ART_GENERATORS,
@@ -383,12 +398,22 @@ export default {
     },
     fetchTokenUris: async function (tokenIds, force = false) {
       for (const tokenId of tokenIds) {
-        let tokenUri = localStorage.getItem(`tokenUri-${tokenId}`);
-        if (tokenUri == null || tokenUri == "null" || force) {
+        let tokenUri = await this.getFromCache("tokenUris", tokenId);
+        let tokenPng = await this.getFromCache("tokenPngs", tokenId);
+
+        if (
+          tokenUri == null ||
+          tokenPng == null ||
+          tokenUri == "null" ||
+          force
+        ) {
           console.warn("uncached tokenUri", tokenId, tokenUri);
           tokenUri = await this.conn.getTokenURI(tokenId);
-          localStorage.setItem(`tokenUri-${tokenId}`, tokenUri);
+          tokenPng = await rasterize(tokenUri);
+          await this.storeInCache("tokenUris", tokenId, tokenUri);
+          await this.storeInCache("tokenPngs", tokenId, tokenPng);
         }
+        this.$set(this.inft.tokenPngs, tokenId, tokenPng);
         this.$set(this.inft.tokenUris, tokenId, tokenUri);
       }
     },
@@ -438,6 +463,21 @@ export default {
       if (event.key === "address") {
         console.log("storage update", event.newValue);
         this.address = event.newValue;
+      }
+    },
+    getFromCache: async function (store, key) {
+      try {
+        return await (await dbPromise).get(store, key);
+      } catch (e) {
+        console.error("Error while getting from cache:", e);
+        return null;
+      }
+    },
+    storeInCache: async function (store, key, value) {
+      try {
+        await (await dbPromise).put(store, value, key);
+      } catch (e) {
+        console.error("Error while storing in cache:", e);
       }
     },
   },

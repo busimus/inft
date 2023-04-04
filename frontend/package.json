@@ -19,6 +19,7 @@
     "ethereumjs-util": "^7.1.5",
     "google-protobuf": "^3.21.2",
     "grpc-tools": "^1.12.4",
+    "idb": "^7.1.1",
     "node-stdlib-browser": "^1.2.0",
     "vue": "^2.7.7"
   },

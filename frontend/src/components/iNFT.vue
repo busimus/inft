@@ -48,9 +48,30 @@
           >
         </b-dropdown>
       </div>
-      <!-- runs MUCH smoother on Firefox than <img> for some reason? -->
-      <object style="width: 100%" :data="tokenImage"></object>
-      <b-button-group v-if="isOwned" style="width: 100%">
+      <div
+        id="imageContainer"
+        @click="showSVG = !showSVG"
+        @mouseover="startAnimation"
+        @mouseout="showSVG = false"
+      >
+        <!-- On everything but Firefox just the img tag has the best behavior -->
+        <img
+          v-if="!isFirefox"
+          style="width: 100%"
+          :src="showSVG ? tokenImageSVG : tokenImagePNG"
+        />
+        <!-- But on Firefox object has the best SVG animation performance but it breaks layout -->
+        <div v-else id="imgOverlayContainer">
+          <object
+            v-if="showSVG"
+            id="imgObject"
+            style="width: 100%; pointer-events: none"
+            :data="tokenImageSVG"
+          />
+          <img id="imgImg" style="width: 100%" :src="tokenImagePNG" />
+        </div>
+      </div>
+      <b-button-group v-if="isOwned" style="width: 100%; margin-top: 0.5em">
         <template #button-content>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -209,11 +230,37 @@ import {
 import { Buffer } from "buffer";
 import { isValidAddress } from "ethereumjs-util";
 
+export async function rasterize(tokenUri) {
+  const svgUrl = JSON.parse(tokenUri).image;
+  const img = new Image();
+  img.src = svgUrl;
+
+  await new Promise((resolve, reject) => {
+    img.onload = () => {
+      URL.revokeObjectURL(svgUrl);
+      resolve();
+    };
+    img.onerror = reject;
+  });
+
+  const scale = Math.max(2, window.devicePixelRatio);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width * scale;
+  canvas.height = img.height * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, 0, 0);
+
+  const pngUrl = canvas.toDataURL("image/png");
+  return pngUrl;
+}
+
 export default {
   name: "iNFT",
   props: {
     tokenId: String,
     tokenUris: Object,
+    tokenPngs: Object,
     isOwned: Boolean,
     generators: Object,
     selectedGenerator: String,
@@ -222,8 +269,9 @@ export default {
     return {
       toAddress: "",
       tokenStorageId: `tokenUri-${this.tokenId}`,
-      toggleAttrs: {},
       selectedGeneratorCopy: this.selectedGenerator,
+      showSVG: false,
+      isFirefox: /Firefox/.test(window.navigator.userAgent),
     };
   },
   methods: {
@@ -238,6 +286,12 @@ export default {
     },
     showMetadataModal() {
       this.$refs["metadata-modal"].show();
+    },
+    startAnimation() {
+      // Needed to prevent a tap from stopping the animation that was started with mouseEnter
+      setTimeout(() => {
+        this.showSVG = true;
+      }, 1);
     },
     regen() {
       this.$emit("regenerate", { tokenId: this.tokenId });
@@ -298,8 +352,11 @@ export default {
       }
       return JSON.parse(this.tokenUris[this.tokenId]);
     },
-    tokenImage() {
+    tokenImageSVG() {
       return this.token.image;
+    },
+    tokenImagePNG() {
+      return this.tokenPngs[this.tokenId];
     },
     tokenMetadata() {
       return JSON.stringify(this.token, null, 2);
@@ -339,5 +396,15 @@ export default {
   border: 0;
   border-color: 0 !important;
   background-color: 0 !important;
+}
+
+#imgOverlayContainer {
+  position: relative;
+}
+
+#imgObject {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 </style>

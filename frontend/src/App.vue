@@ -548,6 +548,14 @@ export default {
       localStorage.address = this.recoverAddress(signature);
       this.address = localStorage.address;
       history.pushState("", document.title, "/");
+    } else if (path == "reset" || path == "resetAll") {
+      localStorage.clear();
+      this.signOut();
+      if (path == "resetAll") {
+        await (await dbPromise).clear("tokenUris");
+        await (await dbPromise).clear("tokenPngs");
+      }
+      history.pushState("", document.title, "/");
     } else if (path) {
       console.log("got path", path);
       const txHash = url.get("tx");

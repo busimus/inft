@@ -230,6 +230,12 @@ import {
 import { Buffer } from "buffer";
 import { isValidAddress } from "ethereumjs-util";
 
+const IS_SAFARI =
+  /constructor/i.test(window.HTMLElement) ||
+  (function (p) {
+    return p.toString() === "[object SafariRemoteNotification]";
+  })(!window["safari"] || safari.pushNotification);
+
 export async function rasterize(tokenUri) {
   const svgUrl = JSON.parse(tokenUri).image;
   const img = new Image();
@@ -242,6 +248,11 @@ export async function rasterize(tokenUri) {
     };
     img.onerror = reject;
   });
+
+  // Safari renders the canvas incorrectly without a context switch???
+  if (IS_SAFARI) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 
   const scale = Math.max(2, window.devicePixelRatio);
   const canvas = document.createElement("canvas");

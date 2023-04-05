@@ -229,12 +229,9 @@ import {
 } from "bootstrap-vue";
 import { Buffer } from "buffer";
 import { isValidAddress } from "ethereumjs-util";
+import { detect } from "detect-browser";
 
-const IS_SAFARI =
-  /constructor/i.test(window.HTMLElement) ||
-  (function (p) {
-    return p.toString() === "[object SafariRemoteNotification]";
-  })(!window["safari"] || safari.pushNotification);
+const BROWSER = detect();
 
 export async function rasterize(tokenUri) {
   const svgUrl = JSON.parse(tokenUri).image;
@@ -250,7 +247,7 @@ export async function rasterize(tokenUri) {
   });
 
   // Safari renders the canvas incorrectly without a context switch???
-  if (IS_SAFARI) {
+  if (BROWSER.name == "safari" || BROWSER.os == "iOS") {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 
@@ -282,7 +279,7 @@ export default {
       tokenStorageId: `tokenUri-${this.tokenId}`,
       selectedGeneratorCopy: this.selectedGenerator,
       showSVG: false,
-      isFirefox: /Firefox/.test(window.navigator.userAgent),
+      isFirefox: BROWSER.name == "firefox",
     };
   },
   methods: {

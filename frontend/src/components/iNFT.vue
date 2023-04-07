@@ -51,8 +51,8 @@
       <div
         id="imageContainer"
         @click="showSVG = !showSVG"
-        @mouseover="startAnimation"
-        @mouseout="showSVG = false"
+        @[!isTouch&&`mouseover`]="startAnimation"
+        @[!isTouch&&`mouseout`]="showSVG = false"
       >
         <!-- On everything but Firefox just the img tag has the best behavior -->
         <img
@@ -280,6 +280,10 @@ export default {
       selectedGeneratorCopy: this.selectedGenerator,
       showSVG: false,
       isFirefox: BROWSER.name == "firefox",
+      isTouch:
+        "ontouchstart" in window ||
+        navigator.maxTouchPoints > 0 ||
+        navigator.msMaxTouchPoints > 0,
     };
   },
   methods: {

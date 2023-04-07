@@ -31,7 +31,7 @@
           </p>
           <p>
             An identity can only generate one iNFT, and it can be regenerated to
-            update its look and stats (looks change once per epoch).
+            update its look and stats.
           </p>
         </b-collapse>
 
@@ -231,7 +231,8 @@ export default {
 &token=${token}
 &nonce_endpoint=${AUTH_WORKER_URL}%2FgetToken
 &authentication_endpoint=${AUTH_WORKER_URL}%2Fauthenticate`;
-      window.open(url, "_blank");
+      var popup = window.open("", "_blank");
+      popup.location = url;
     },
     fetchSignature: async function (token) {
       const response = await fetch(
@@ -323,6 +324,7 @@ export default {
       await this.buildTx("burn", argsArray);
     },
     buildTx: async function (method, args) {
+      var popup = window.open("", "_blank");
       this.generating = true;
       console.log(method, args);
       try {
@@ -353,8 +355,9 @@ export default {
         console.log("serialized", serialized);
         const url = `https://app.idena.io/dna/raw?tx=${serialized}
         &callback_url=${CALLBACK_URL}${method}`;
-        window.open(url, "_blank");
+        popup.location = url;
       } catch (e) {
+        popup.close();
         console.error(e);
       }
       this.generating = false;
@@ -441,8 +444,9 @@ export default {
       }
     },
     openTokenOwner: async function (tokenId) {
+      var popup = window.open("", "_blank");
       const owner = await this.conn.getTokenOwner(tokenId);
-      window.open(`https://scan.idena.io/identity/${owner}`, "_blank");
+      popup.location = `https://scan.idena.io/identity/${owner}`;
     },
     setGenerator(name) {
       this.selectedGenerator = name;

@@ -28,15 +28,7 @@
           </div>
         </div>
       </div>
-      <button
-        class="btn btn-outline-danger"
-        @mousedown="holdStart"
-        @mouseup="holdStop"
-        @mouseleave="holdStop"
-        @touchstart="holdStart"
-        @touchend="holdStop"
-        @touchcancel="holdStop"
-      >
+      <button class="btn btn-outline-danger" @click.stop="$emit('signOut')">
         <b-icon-x />
       </button>
     </div>
@@ -55,37 +47,9 @@ export default {
     identity: Object,
   },
   data: () => {
-    return {
-      interval: null,
-      holdCount: 0,
-    };
+    return {};
   },
-  methods: {
-    holdStart: function () {
-      const self = this;
-      this.holdCount = 1;
-      if (!this.holdInterval) {
-        this.holdInterval = setInterval(() => {
-          self.holdCount++;
-          if (self.holdCount > 20) {
-            localStorage.clear();
-            this.$emit("signOut");
-            clearInterval(self.holdInterval);
-            self.holdInterval = null;
-            self.holdCount = 0;
-          }
-        }, 100);
-      }
-    },
-    holdStop: function () {
-      clearInterval(this.holdInterval);
-      this.holdInterval = null;
-      if (this.holdCount <= 10 && this.holdCount !== 0) {
-        this.$emit("signOut");
-      }
-      this.holdCount = 0;
-    },
-  },
+  methods: {},
   computed: {
     signedIn() {
       return this.identity != null && this.identity.address != null;
@@ -95,13 +59,6 @@ export default {
 </script>
 
 <style scoped>
-/*
- * .statusBar {
- *     width: 100%;
- *     display: inline-block;
- * }
- */
-
 .identity {
   height: 5rem;
   display: flex;
